@@ -125,10 +125,16 @@ This system automates defect logging from dashcam footage, enabling:
 
 ## Architecture Overview
 
-```
-Upload → Preprocessor → Detector (YOLO) → Tracker (ByteTrack) → UI + CSV
-               ↑               ↑                  ↑
-         config/settings.py  models/*.pt    src/core/tracker.py
+```mermaid
+flowchart LR
+    A([Upload]) --> B[Preprocessor]
+    B --> C["Detector (YOLO)"]
+    C --> D["Tracker (ByteTrack)"]
+    D --> E([UI + CSV])
+    
+    F["config/settings.py"] -.-> B
+    G["models/*.pt"] -.-> C
+    H["src/core/tracker.py"] -.-> D
 ```
 
 ---
