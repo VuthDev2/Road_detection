@@ -1,4 +1,42 @@
-venv/
+# ── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── Data (large files — download via Roboflow) ───────────────────────────────
+data/raw/
+data/processed/
+
+# ── IDE & editor artifacts ───────────────────────────────────────────────────
+.kilo/
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
+
+# ── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Testing ──────────────────────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+
+# ── Streamlit ────────────────────────────────────────────────────────────────
+.streamlit/
+
+# ── Ultralytics / YOLO run artifacts ─────────────────────────────────────────
+runs/
