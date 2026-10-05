@@ -23,10 +23,13 @@ DATA_DIR = PROJECT_ROOT / "data"
 # ---------------------------------------------------------------------------
 
 AVAILABLE_MODELS: dict[str, Path] = {
-    "YOLO26 — yolo26.pt (new)": PROJECT_ROOT / "yolo26.pt",
+    "YOLO26 — Road Damage (small)": MODELS_DIR / "yolo26_model.pt",
     "YOLOv8n — pothole_model.pt": MODELS_DIR / "pothole_model.pt",
-    "YOLO26 — yolo26_model.pt": MODELS_DIR / "yolo26_model.pt",
 }
+FALLBACK_MODEL_PATH = MODELS_DIR / "yolo26_model.pt"
+NEW_MODEL_PATH = PROJECT_ROOT / "model.pt"
+if NEW_MODEL_PATH.is_file():
+    AVAILABLE_MODELS["YOLO — model.pt (new)"] = NEW_MODEL_PATH
 
 # ---------------------------------------------------------------------------
 # Damage class names (must match training label order)

@@ -96,6 +96,12 @@ Then upload an image or the provided `data/samples/real_road_test.mp4`.
 
 ## Models & Results
 
+The app only accepts models whose class labels match the four road-damage
+categories above. If a selected checkpoint is missing or is a general-purpose
+model (for example, one that detects COCO objects such as toilets), the app
+automatically switches to the small road-damage checkpoint at
+`models/yolo26_model.pt` and displays a warning.
+
 | Model | mAP50-95 | Precision | Recall | Params | Speed |
 |-------|----------|-----------|--------|--------|-------|
 | YOLOv8n (`pothole_model.pt`) | **0.62** | 0.81 | 0.76 | 3.2M | 5 ms/frame |

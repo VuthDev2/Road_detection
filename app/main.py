@@ -44,7 +44,13 @@ def main() -> None:
     # ── Load model (cached) ────────────────────────────────────────────
     try:
         detector = Detector(model_path)
-        st.sidebar.success(f"✓ Model loaded: `{model_path.name}`")
+        if detector.fallback_reason:
+            st.sidebar.warning(
+                f"Selected model was unavailable or incompatible "
+                f"({detector.fallback_reason}). Using road-damage fallback: "
+                f"`{detector.model_path.name}`."
+            )
+        st.sidebar.success(f"✓ Model loaded: `{detector.model_path.name}`")
     except Exception as exc:
         st.sidebar.error(f"Error loading model: {exc}")
         st.stop()

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from config.settings import InferenceConfig
+from config.settings import FALLBACK_MODEL_PATH, InferenceConfig
 
 
 # ---------------------------------------------------------------------------
@@ -83,3 +83,34 @@ class TestDetector:
     def test_class_names_returns_dict(self, detector, mock_model):
         assert isinstance(detector.class_names, dict)
         assert detector.class_names[3] == "Pothole"
+
+    def test_general_model_uses_road_damage_fallback(self, mock_model):
+        from src.core.detector import Detector
+
+        general_model = MagicMock()
+        general_model.names = {0: "toilet"}
+
+        with patch.object(
+            Detector, "_load", side_effect=[general_model, mock_model]
+        ) as load_model:
+            detector = Detector(Path("yolo26.pt"))
+
+        assert detector.requested_model_path == Path("yolo26.pt")
+        assert detector.model_path == FALLBACK_MODEL_PATH
+        assert "Expected" in detector.fallback_reason
+        assert detector.class_names == mock_model.names
+        load_model.assert_any_call(str(FALLBACK_MODEL_PATH))
+
+    def test_fallback_failure_is_reported(self):
+        from src.core.detector import Detector
+
+        general_model = MagicMock()
+        general_model.names = {0: "toilet"}
+
+        with patch.object(
+            Detector,
+            "_load",
+            side_effect=[general_model, FileNotFoundError("missing weights")],
+        ):
+            with pytest.raises(RuntimeError, match="fallback model"):
+                Detector(Path("yolo26.pt"))

@@ -18,7 +18,12 @@ if TYPE_CHECKING:
     import numpy as np
     from PIL.Image import Image as PILImage
 
-from config.settings import InferenceConfig, DEFAULT_SETTINGS
+from config.settings import (
+    DAMAGE_CLASSES,
+    DEFAULT_SETTINGS,
+    FALLBACK_MODEL_PATH,
+    InferenceConfig,
+)
 
 
 class Detector:
@@ -38,8 +43,47 @@ class Detector:
     """
 
     def __init__(self, model_path: str | Path) -> None:
-        self.model_path = Path(model_path)
-        self._model: YOLO = self._load(str(self.model_path))
+        self.requested_model_path = Path(model_path)
+        self.model_path = self.requested_model_path
+        self.fallback_reason: str | None = None
+
+        try:
+            model = self._load(str(self.model_path))
+            self._validate_road_damage_model(model)
+        except Exception as primary_error:
+            fallback_path = FALLBACK_MODEL_PATH
+            if self.model_path.resolve() == fallback_path.resolve():
+                raise RuntimeError(
+                    f"Road-damage model `{self.model_path}` could not be loaded: "
+                    f"{primary_error}"
+                ) from primary_error
+
+            try:
+                model = self._load(str(fallback_path))
+                self._validate_road_damage_model(model)
+            except Exception as fallback_error:
+                raise RuntimeError(
+                    f"Selected model `{self.model_path}` is unavailable or "
+                    f"incompatible ({primary_error}); fallback model "
+                    f"`{fallback_path}` also failed ({fallback_error})."
+                ) from fallback_error
+
+            self.model_path = fallback_path
+            self.fallback_reason = str(primary_error)
+
+        self._model: YOLO = model
+
+    @staticmethod
+    def _validate_road_damage_model(model: YOLO) -> None:
+        """Reject general-purpose models that can label unrelated objects."""
+        names = model.names
+        actual_classes = set(names.values()) if isinstance(names, dict) else set()
+        expected_classes = set(DAMAGE_CLASSES)
+        if actual_classes != expected_classes:
+            raise ValueError(
+                "Model classes do not match the road-damage classes. "
+                f"Expected {sorted(expected_classes)}; got {sorted(actual_classes)}."
+            )
 
     @staticmethod
     @st.cache_resource
