@@ -8,6 +8,7 @@ All business logic (tracking state, CSV export) lives in src/ modules.
 from __future__ import annotations
 
 import tempfile
+import time
 
 import cv2
 import streamlit as st
@@ -94,11 +95,14 @@ def render_video_page(
         total_value = f"{len(state.unique_ids)} (Raw: {state.raw_detections})"
         update_telemetry(telemetry, counts, total_label, total_value)
 
-        # ── Show annotated frame ───────────────────────────────────────
-        frame_rgb = annotated_to_rgb(results[0])
-        media_placeholder.image(
-            frame_rgb, channels="RGB", use_container_width=True
-        )
+        # ── Show annotated frame (skip frames to save Cloud bandwidth) ──
+        if frame_idx % 3 == 0:
+            frame_rgb = annotated_to_rgb(results[0])
+            media_placeholder.image(
+                frame_rgb, channels="RGB", use_container_width=True
+            )
+            # Yield to Streamlit so the frontend can render the image over the network
+            time.sleep(0.02)
 
         # ── Progress bar ───────────────────────────────────────────────
         frame_idx += 1
