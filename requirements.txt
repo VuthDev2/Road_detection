@@ -1,5 +1,6 @@
 # Runtime dependencies — install these in production / on Colab
 ultralytics>=8.0.0
+lap>=0.5.13
 torch>=2.0.0
 torchvision>=0.15.0
 streamlit>=1.30.0
