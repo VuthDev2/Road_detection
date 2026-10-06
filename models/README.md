@@ -4,17 +4,32 @@ This directory contains the trained `.pt` model weight files used by the applica
 
 ## Models
 
-| File | Architecture | Optimizer | Epochs | mAP50-95 | Notes |
-|------|-------------|-----------|--------|----------|-------|
-| `pothole_model.pt` | YOLOv8n (Nano) | SGD | 50 | 0.62 | Anchor-free, primary model |
-| `yolo26_model.pt` | YOLO26 / YOLOv5nu | Adam | 50 | 0.58 | Anchor-based, comparison model |
+| File | Architecture | Type | Optimizer | Epochs | Notes |
+|------|-------------|------|-----------|--------|-------|
+| `yolo26_model.pt` | YOLO26 (Nano) | Anchor-based | SGD | 30 | **Primary model** — full fine-tune, all layers unfrozen |
+| `pothole_model.pt` | YOLOv8n (Nano) | Anchor-free | SGD | 50 | Baseline comparison model |
 
 ## Dataset
 
 Both models were trained on the **Roboflow Universe Road Damage Detection** dataset:
-- **Classes**: Longitudinal Crack, Transverse Crack, Alligator Crack, Pothole
+
+- **Classes (4)**: Longitudinal Crack, Transverse Crack, Alligator Crack, Pothole
 - **Split**: 70% train / 20% val / 10% test
 - **Input size**: 640 × 640
+- **Training environment**: Kaggle (Dual T4 GPU)
+
+## Augmentations Applied (YOLO26 fine-tune)
+
+| Augmentation | Value | Purpose |
+|---|---|---|
+| Mosaic | 1.0 (100%) | 4-image stitching for complex context |
+| Mixup | 0.1 (10%) | Prevents asphalt texture overfitting |
+| HSV Hue | 0.015 | Sensor variance across regions |
+| HSV Saturation | 0.7 | Color variance |
+| HSV Value | 0.4 | Wet asphalt, shadows, and glare |
+| Horizontal Flip | 0.5 (50%) | Road direction invariance |
+| Scale | 0.5 | Varied camera distances |
+| Vertical Flip | 0.0 | Disabled — roads stay grounded |
 
 ## Adding New Models
 

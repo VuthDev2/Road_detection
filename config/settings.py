@@ -27,9 +27,7 @@ AVAILABLE_MODELS: dict[str, Path] = {
     "YOLOv8n — pothole_model.pt": MODELS_DIR / "pothole_model.pt",
 }
 FALLBACK_MODEL_PATH = MODELS_DIR / "yolo26_model.pt"
-NEW_MODEL_PATH = PROJECT_ROOT / "model.pt"
-if NEW_MODEL_PATH.is_file():
-    AVAILABLE_MODELS["YOLO — model.pt (new)"] = NEW_MODEL_PATH
+
 
 # ---------------------------------------------------------------------------
 # Damage class names (must match training label order)

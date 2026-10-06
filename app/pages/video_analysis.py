@@ -95,14 +95,23 @@ def render_video_page(
         total_value = f"{len(state.unique_ids)} (Raw: {state.raw_detections})"
         update_telemetry(telemetry, counts, total_label, total_value)
 
-        # ── Show annotated frame (skip frames to save Cloud bandwidth) ──
-        if frame_idx % 3 == 0:
-            frame_rgb = annotated_to_rgb(results[0])
-            media_placeholder.image(
-                frame_rgb, channels="RGB", use_container_width=True
-            )
-            # Yield to Streamlit so the frontend can render the image over the network
-            time.sleep(0.02)
+        # ── Show annotated frame (resized for smooth Cloud playback) ───
+        frame_rgb = annotated_to_rgb(results[0])
+        
+        # Resize for UI display to drastically reduce network payload
+        # (YOLO still processed the high-res frame)
+        h, w = frame_rgb.shape[:2]
+        max_width = 720
+        if w > max_width:
+            scale = max_width / w
+            new_w, new_h = int(w * scale), int(h * scale)
+            frame_rgb = cv2.resize(frame_rgb, (new_w, new_h))
+            
+        media_placeholder.image(
+            frame_rgb, channels="RGB", use_container_width=True
+        )
+        # Micro-yield to flush WebSocket
+        time.sleep(0.001)
 
         # ── Progress bar ───────────────────────────────────────────────
         frame_idx += 1

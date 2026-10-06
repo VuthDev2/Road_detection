@@ -18,7 +18,7 @@ Detects four damage categories from dashcam images and video:
 ```
 road-damage-detection/
 │
-├── app.py                    # Entry point shim — run: streamlit run app.py
+├── app.py                    # Entry point — run: streamlit run app.py
 │
 ├── app/                      # Streamlit UI layer
 │   ├── main.py               # Orchestrator: page config, routing
@@ -36,39 +36,39 @@ road-damage-detection/
 │   │   └── tracker.py        # ByteTrack result parser + DefectLog
 │   └── utils/
 │       ├── export.py         # CSV export from TrackingState
-│       └── visualization.py  # annotated frame → RGB helper
+│       └── visualization.py  # Annotated frame → RGB helper
 │
 ├── config/
 │   └── settings.py           # All constants: paths, defaults, class names
 │
 ├── models/
-│   ├── pothole_model.pt      # YOLOv8n trained weights
-│   ├── yolo26_model.pt       # YOLO26 trained weights
-│   └── README.md             # Model documentation
+│   ├── yolo26_model.pt       # YOLO26 fine-tuned weights (primary model)
+│   ├── pothole_model.pt      # YOLOv8n baseline weights
+│   └── README.md             # Model documentation & training details
 │
-├── notebooks/                # Colab training notebooks
-│   ├── 01_data_preparation.ipynb
-│   ├── 02_train_yolov8.ipynb
-│   ├── 03_train_yolo_alt.ipynb
-│   └── 04_train_rtdetr.ipynb
+├── notebooks/
+│   └── 00_master_training.ipynb  # Full fine-tuning pipeline (Kaggle)
 │
 ├── data/                     # Dataset (raw/processed are git-ignored)
-│   ├── samples/              # Demo footage
-│   │   └── real_road_test.mp4
+│   ├── raw/                  # Original downloaded dataset
+│   ├── processed/            # YOLO-format labels and images
+│   ├── samples/
+│   │   └── real_road_test.mp4  # Demo footage
 │   └── README.md             # Download instructions
 │
 ├── results/
-│   ├── figures/              # Training plots (learning curves, mAP)
+│   ├── figures/              # Training plots (learning curves, mAP comparison)
 │   └── logs/                 # Exported CSV defect logs
 │
-├── docs/slides/              # Presentation materials
+├── docs/
+│   └── slides/               # Presentation materials
 │
 ├── tests/                    # Unit tests (no GPU required)
 │   ├── test_detector.py
 │   └── test_preprocessor.py
 │
 ├── requirements.txt          # Runtime dependencies
-└── requirements-dev.txt      # Dev/research dependencies (adds pytest, jupyter)
+└── requirements-dev.txt      # Dev dependencies (adds pytest, jupyter)
 ```
 
 ---
@@ -81,7 +81,7 @@ git clone <your-repo-url>
 cd road-damage-detection
 
 # 2. Create a virtual environment
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 
 # 3. Install runtime dependencies
 pip install -r requirements.txt
@@ -94,19 +94,45 @@ Then upload an image or the provided `data/samples/real_road_test.mp4`.
 
 ---
 
-## Models & Results
+## Models & Training
 
-The app only accepts models whose class labels match the four road-damage
-categories above. If a selected checkpoint is missing or is a general-purpose
-model (for example, one that detects COCO objects such as toilets), the app
-automatically switches to the small road-damage checkpoint at
-`models/yolo26_model.pt` and displays a warning.
+Two YOLO-based nano models were trained and evaluated on the Road Damage Detection dataset:
 
-| Model | mAP50-95 | Precision | Recall | Params | Speed |
-|-------|----------|-----------|--------|--------|-------|
-| YOLOv8n (`pothole_model.pt`) | **0.62** | 0.81 | 0.76 | 3.2M | 5 ms/frame |
-| YOLO26 (`yolo26_model.pt`) | 0.58 | 0.77 | 0.73 | 2.5M | 4 ms/frame |
-| RT-DETR ResNet50 | **0.66** | **0.84** | **0.78** | 32M | 15 ms/frame |
+| Model | Architecture | Epochs | Params | Speed |
+|-------|-------------|--------|--------|-------|
+| `yolo26_model.pt` | YOLO26 Nano | 30 | 2.5M | 4 ms/frame |
+| `pothole_model.pt` | YOLOv8n | 50 | 3.2M | 5 ms/frame |
+
+**Training environment:** Kaggle (Dual T4 GPU)  
+**Training strategy:** Full fine-tuning (all layers unfrozen)  
+**Image size:** 640×640
+
+---
+
+## Architecture Overview
+
+```mermaid
+flowchart LR
+    A([Upload]) --> B[Preprocessor]
+    B --> C["Detector (YOLO)"]
+    C --> D["Tracker (ByteTrack)"]
+    D --> E([UI + CSV Export])
+
+    F["config/settings.py"] -.-> B
+    G["models/*.pt"] -.-> C
+    H["src/core/tracker.py"] -.-> D
+```
+
+---
+
+## Dataset
+
+**Source:** Roboflow Universe — Road Damage Detection Dataset  
+**Split:** 70% train / 20% val / 10% test  
+**Preprocessing:** Contrast enhancement, Auto-Orient, 640×640 resize  
+**Augmentation:** Mosaic (100%), Mixup (10%), HSV shifts, Scale, Horizontal flip (50%)
+
+See [`data/README.md`](data/README.md) for download instructions.
 
 ---
 
@@ -119,48 +145,11 @@ python -m pytest tests/ -v
 
 ---
 
-## Problem Statement
-
-Road damage (potholes, cracks) causes accidents and high maintenance costs.
-This system automates defect logging from dashcam footage, enabling:
-- **Real-time detection** at 5–15 ms/frame
-- **Unique defect tracking** via ByteTrack (avoids double-counting the same pothole)
-- **CSV export** for maintenance teams
-
----
-
-## Architecture Overview
-
-```mermaid
-flowchart LR
-    A([Upload]) --> B[Preprocessor]
-    B --> C["Detector (YOLO)"]
-    C --> D["Tracker (ByteTrack)"]
-    D --> E([UI + CSV])
-    
-    F["config/settings.py"] -.-> B
-    G["models/*.pt"] -.-> C
-    H["src/core/tracker.py"] -.-> D
-```
-
----
-
 ## Error Analysis & Limitations
 
 - **False Positives**: Shadows and water puddles occasionally misclassified as potholes.
-- **Missed Detections**: Hairline cracks under poor lighting.
+- **Missed Detections**: Hairline cracks under poor lighting conditions.
 - **Limitation**: Trained primarily on daylight images; nighttime performance degrades.
-
----
-
-## Dataset
-
-**Source**: Roboflow Universe — Road Damage Detection Dataset  
-**Split**: 70% train / 20% val / 10% test  
-**Preprocessing**: Contrast enhancement, Auto-Orient, 640×640 resize  
-**Augmentation**: Horizontal flip (50%), Brightness ±15%, Blur (≤1px)
-
-See [`data/README.md`](data/README.md) for download instructions.
 
 ---
 
@@ -174,5 +163,5 @@ See [`data/README.md`](data/README.md) for download instructions.
 
 ## Citations
 
-- Ultralytics YOLOv8: https://github.com/ultralytics/ultralytics
-- Dataset: Roboflow Universe Road Damage Datasets
+- Ultralytics YOLO: https://github.com/ultralytics/ultralytics
+- Dataset: Roboflow Universe Road Damage Detection Dataset
