@@ -72,6 +72,7 @@ def render_video_page(
     progress_bar = st.progress(0, text="Processing video…")
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
     frame_idx = 0
+    last_ui_update = time.time()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -89,8 +90,11 @@ def render_video_page(
         # ── Update tracking state ──────────────────────────────────────
         parser.update(state, results[0], timestamp_sec)
 
-        # ── Throttle UI Updates (Prevent Streamlit WebSocket from freezing) ──
-        if frame_idx % 3 == 0 or frame_idx == total_frames - 1:
+        # ── Throttle UI Updates (Max 4 FPS to prevent WebSocket freeze) ──
+        current_time = time.time()
+        if current_time - last_ui_update > 0.25 or frame_idx == total_frames - 1:
+            last_ui_update = current_time
+            
             # ── Update telemetry widgets ───────────────────────────────────
             counts = TrackerParser.class_counts(state)
             total_label = "Unique Tracked Defects"
@@ -111,8 +115,9 @@ def render_video_page(
             media_placeholder.image(
                 frame_rgb, channels="RGB", use_container_width=True
             )
-            # Micro-yield to flush WebSocket
-            time.sleep(0.01)
+            
+            # Yield to Tornado event loop to flush WebSocket messages
+            time.sleep(0.05)
 
             # ── Progress bar ───────────────────────────────────────────────
             progress_bar.progress(
