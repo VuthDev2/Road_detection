@@ -25,6 +25,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 AVAILABLE_MODELS: dict[str, Path] = {
     "YOLO26 — Road Damage (small)": MODELS_DIR / "yolo26_model.pt",
     "YOLOv8n — pothole_model.pt": MODELS_DIR / "pothole_model.pt",
+    "YOLOv8 — Custom Model": MODELS_DIR / "model.pt",
 }
 FALLBACK_MODEL_PATH = MODELS_DIR / "yolo26_model.pt"
 
