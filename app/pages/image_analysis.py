@@ -12,6 +12,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import streamlit as st
+import tempfile
 from PIL import Image
 
 from config.settings import InferenceConfig, DAMAGE_CLASSES
@@ -33,19 +34,6 @@ def render_image_page(
 ) -> None:
     """
     Run the full image analysis pipeline and update the UI.
-
-    Parameters
-    ----------
-    uploaded_file : UploadedFile
-        Streamlit uploaded file object (image).
-    detector : Detector
-        Pre-loaded inference wrapper.
-    cfg : InferenceConfig
-        Active inference hyperparameters.
-    media_placeholder : DeltaGenerator
-        Streamlit placeholder for displaying the annotated image.
-    telemetry : TelemetryWidgets
-        Telemetry widget references to update with detection counts.
     """
     preprocessor = Preprocessor()
 
@@ -55,9 +43,10 @@ def render_image_page(
         if cfg.enhance_contrast:
             image = preprocessor.enhance_image(image)
 
-        # Convert to BGR numpy array for YOLO (prevents PIL-related crashes in ultralytics)
-        image_bgr = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        results = detector.predict(image_bgr, cfg)
+        # Bypass YOLOv8 array/tensor bugs by saving to a tempfile and passing the path
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            image.save(tmp.name)
+            results = detector.predict(tmp.name, cfg)
 
     # ── Count detections by class ──────────────────────────────────────
     class_counts: dict[str, int] = {name: 0 for name in DAMAGE_CLASSES}
