@@ -25,6 +25,9 @@ from app.components.telemetry import (
 )
 
 
+import os
+import subprocess
+
 def render_video_page(
     uploaded_file,
     file_extension: str,
@@ -36,21 +39,6 @@ def render_video_page(
     """
     Run the full video analysis pipeline: read frames, track defects,
     update the live UI, and offer a CSV download when done.
-
-    Parameters
-    ----------
-    uploaded_file : UploadedFile
-        Streamlit uploaded file object (video).
-    file_extension : str
-        File extension without the dot (e.g. "mp4").
-    detector : Detector
-        Pre-loaded inference wrapper.
-    cfg : InferenceConfig
-        Active inference hyperparameters.
-    media_placeholder : DeltaGenerator
-        Streamlit placeholder for the live annotated frame feed.
-    telemetry : TelemetryWidgets
-        Telemetry widget references updated each frame.
     """
     preprocessor = Preprocessor()
     parser = TrackerParser()
@@ -69,10 +57,25 @@ def render_video_page(
         st.error("❌ Could not open video file. Please try a different file.")
         return
 
-    progress_bar = st.progress(0, text="Processing video…")
+    # ── Setup Video Writer ─────────────────────────────────────────────
+    fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+    
+    # We write to a temporary mp4v file first (OpenCV support)
+    temp_out_path = video_path.replace(f".{file_extension}", "_out.mp4")
+    final_out_path = video_path.replace(f".{file_extension}", "_final.mp4")
+    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(temp_out_path, fourcc, fps, (width, height))
+
+    progress_bar = st.progress(0, text="Processing video in background (this ensures smooth playback)...")
     frame_idx = 0
     last_ui_update = time.time()
+
+    # Clear the media placeholder with an informative message
+    media_placeholder.info("⚙️ Processing video frame-by-frame... The final smooth video will appear here when complete.")
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -89,10 +92,15 @@ def render_video_page(
 
         # ── Update tracking state ──────────────────────────────────────
         parser.update(state, results[0], timestamp_sec)
+        
+        # ── Write annotated frame to video file ────────────────────────
+        # plot() returns a BGR numpy array natively, which cv2.VideoWriter requires
+        annotated_bgr = results[0].plot()
+        writer.write(annotated_bgr)
 
-        # ── Throttle UI Updates (Max 4 FPS to prevent WebSocket freeze) ──
+        # ── Throttle UI Updates (Max 5 FPS) ────────────────────────────
         current_time = time.time()
-        if current_time - last_ui_update > 0.25 or frame_idx == total_frames - 1:
+        if current_time - last_ui_update > 0.2 or frame_idx == total_frames - 1:
             last_ui_update = current_time
             
             # ── Update telemetry widgets ───────────────────────────────────
@@ -101,34 +109,41 @@ def render_video_page(
             total_value = f"{len(state.unique_ids)} (Raw: {state.raw_detections})"
             update_telemetry(telemetry, counts, total_label, total_value)
 
-            # ── Show annotated frame (resized for smooth Cloud playback) ───
-            frame_rgb = annotated_to_rgb(results[0])
-            
-            # Resize for UI display to drastically reduce network payload
-            h, w = frame_rgb.shape[:2]
-            max_width = 640
-            if w > max_width:
-                scale = max_width / w
-                new_w, new_h = int(w * scale), int(h * scale)
-                frame_rgb = cv2.resize(frame_rgb, (new_w, new_h))
-                
-            media_placeholder.image(
-                frame_rgb, channels="RGB", use_container_width=True
-            )
-            
-            # Yield to Tornado event loop to flush WebSocket messages
-            time.sleep(0.05)
-
             # ── Progress bar ───────────────────────────────────────────────
             progress_bar.progress(
                 min(frame_idx / total_frames, 1.0),
-                text=f"Frame {frame_idx}/{total_frames}",
+                text=f"Frame {frame_idx}/{total_frames} processed...",
             )
         
         frame_idx += 1
 
     cap.release()
+    writer.release()
+    
+    # ── Convert to H264 for HTML5 Web Playback ─────────────────────────
+    progress_bar.progress(1.0, text="Finalizing video encoding for web playback...")
+    
+    # FFMPEG is highly recommended for converting the mp4v to an HTML5 compatible libx264 stream.
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", temp_out_path, "-vcodec", "libx264", final_out_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True
+        )
+        display_path = final_out_path
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Fallback if ffmpeg isn't installed (though we added it to packages.txt)
+        st.warning("FFMPEG not found. Video may not play in some browsers.")
+        display_path = temp_out_path
+
     progress_bar.empty()
+    media_placeholder.empty()
+
+    # ── Play the completely smooth final video! ────────────────────────
+    with open(display_path, 'rb') as f:
+        video_bytes = f.read()
+    media_placeholder.video(video_bytes)
 
     st.success(
         f"✅ Video analysis complete — "
