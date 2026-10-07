@@ -1,4 +1,5 @@
 # Runtime dependencies — install these in production / on Colab
+--extra-index-url https://download.pytorch.org/whl/cpu
 ultralytics>=8.0.0
 lap>=0.5.13
 torch>=2.0.0
