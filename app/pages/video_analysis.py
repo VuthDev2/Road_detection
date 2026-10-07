@@ -89,36 +89,38 @@ def render_video_page(
         # ── Update tracking state ──────────────────────────────────────
         parser.update(state, results[0], timestamp_sec)
 
-        # ── Update telemetry widgets ───────────────────────────────────
-        counts = TrackerParser.class_counts(state)
-        total_label = "Unique Tracked Defects"
-        total_value = f"{len(state.unique_ids)} (Raw: {state.raw_detections})"
-        update_telemetry(telemetry, counts, total_label, total_value)
+        # ── Throttle UI Updates (Prevent Streamlit WebSocket from freezing) ──
+        if frame_idx % 3 == 0 or frame_idx == total_frames - 1:
+            # ── Update telemetry widgets ───────────────────────────────────
+            counts = TrackerParser.class_counts(state)
+            total_label = "Unique Tracked Defects"
+            total_value = f"{len(state.unique_ids)} (Raw: {state.raw_detections})"
+            update_telemetry(telemetry, counts, total_label, total_value)
 
-        # ── Show annotated frame (resized for smooth Cloud playback) ───
-        frame_rgb = annotated_to_rgb(results[0])
-        
-        # Resize for UI display to drastically reduce network payload
-        # (YOLO still processed the high-res frame)
-        h, w = frame_rgb.shape[:2]
-        max_width = 720
-        if w > max_width:
-            scale = max_width / w
-            new_w, new_h = int(w * scale), int(h * scale)
-            frame_rgb = cv2.resize(frame_rgb, (new_w, new_h))
+            # ── Show annotated frame (resized for smooth Cloud playback) ───
+            frame_rgb = annotated_to_rgb(results[0])
             
-        media_placeholder.image(
-            frame_rgb, channels="RGB", use_container_width=True
-        )
-        # Micro-yield to flush WebSocket
-        time.sleep(0.001)
+            # Resize for UI display to drastically reduce network payload
+            h, w = frame_rgb.shape[:2]
+            max_width = 640
+            if w > max_width:
+                scale = max_width / w
+                new_w, new_h = int(w * scale), int(h * scale)
+                frame_rgb = cv2.resize(frame_rgb, (new_w, new_h))
+                
+            media_placeholder.image(
+                frame_rgb, channels="RGB", use_container_width=True
+            )
+            # Micro-yield to flush WebSocket
+            time.sleep(0.01)
 
-        # ── Progress bar ───────────────────────────────────────────────
+            # ── Progress bar ───────────────────────────────────────────────
+            progress_bar.progress(
+                min(frame_idx / total_frames, 1.0),
+                text=f"Frame {frame_idx}/{total_frames}",
+            )
+        
         frame_idx += 1
-        progress_bar.progress(
-            min(frame_idx / total_frames, 1.0),
-            text=f"Frame {frame_idx}/{total_frames}",
-        )
 
     cap.release()
     progress_bar.empty()
