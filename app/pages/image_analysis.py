@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import cv2
+import numpy as np
 import streamlit as st
 from PIL import Image
 
@@ -48,12 +50,14 @@ def render_image_page(
     preprocessor = Preprocessor()
 
     with st.spinner("🔍 Running inference…"):
-        image = Image.open(uploaded_file)
+        image = Image.open(uploaded_file).convert("RGB")
 
         if cfg.enhance_contrast:
             image = preprocessor.enhance_image(image)
 
-        results = detector.predict(image, cfg)
+        # Convert to BGR numpy array for YOLO (prevents PIL-related crashes in ultralytics)
+        image_bgr = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        results = detector.predict(image_bgr, cfg)
 
     # ── Count detections by class ──────────────────────────────────────
     class_counts: dict[str, int] = {name: 0 for name in DAMAGE_CLASSES}
