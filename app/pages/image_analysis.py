@@ -46,7 +46,13 @@ def render_image_page(
         # Bypass YOLOv8 array/tensor bugs by saving to a tempfile and passing the path
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             image.save(tmp.name)
-            results = detector.predict(tmp.name, cfg)
+            try:
+                results = detector.predict(tmp.name, cfg)
+            except Exception as e:
+                import traceback
+                st.error(f"Actual error: {type(e).__name__}: {str(e)}")
+                st.code(traceback.format_exc())
+                st.stop()
 
     # ── Count detections by class ──────────────────────────────────────
     class_counts: dict[str, int] = {name: 0 for name in DAMAGE_CLASSES}
