@@ -63,12 +63,23 @@ def render_video_page(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
     
-    # We write to a temporary mp4v file first (OpenCV support)
+    # Setup Video Writer with multi-codec fallback (avc1 works on macOS AVFoundation, mp4v on Linux)
     temp_out_path = video_path.replace(f".{file_extension}", "_out.mp4")
     final_out_path = video_path.replace(f".{file_extension}", "_final.mp4")
     
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(temp_out_path, fourcc, fps, (width, height))
+    writer = None
+    for codec in ["avc1", "H264", "mp4v", "MJPG"]:
+        try:
+            w = cv2.VideoWriter(temp_out_path, cv2.VideoWriter_fourcc(*codec), fps, (width, height))
+            if w.isOpened():
+                writer = w
+                break
+        except Exception:
+            continue
+
+    if writer is None or not writer.isOpened():
+        st.error("❌ Failed to initialize video encoder on this system.")
+        return
 
     progress_bar = st.progress(0, text="Processing video in background (this ensures smooth playback)...")
     frame_idx = 0
@@ -100,9 +111,17 @@ def render_video_page(
 
         # ── Throttle UI Updates (Max 5 FPS) ────────────────────────────
         current_time = time.time()
-        if current_time - last_ui_update > 0.2 or frame_idx == total_frames - 1:
+        if current_time - last_ui_update > 0.15 or frame_idx == total_frames - 1:
             last_ui_update = current_time
             
+            # ── Live annotated frame preview ──────────────────────────────
+            live_frame_rgb = annotated_to_rgb(results[0])
+            media_placeholder.image(
+                live_frame_rgb,
+                caption=f"⚡ Live Processing Preview — Frame {frame_idx + 1}/{total_frames}",
+                use_container_width=True,
+            )
+
             # ── Update telemetry widgets ───────────────────────────────────
             counts = TrackerParser.class_counts(state)
             total_label = "Unique Tracked Defects"
@@ -111,8 +130,8 @@ def render_video_page(
 
             # ── Progress bar ───────────────────────────────────────────────
             progress_bar.progress(
-                min(frame_idx / total_frames, 1.0),
-                text=f"Frame {frame_idx}/{total_frames} processed...",
+                min((frame_idx + 1) / total_frames, 1.0),
+                text=f"Frame {frame_idx + 1}/{total_frames} processed...",
             )
         
         frame_idx += 1
@@ -123,27 +142,49 @@ def render_video_page(
     # ── Convert to H264 for HTML5 Web Playback ─────────────────────────
     progress_bar.progress(1.0, text="Finalizing video encoding for web playback...")
     
-    # FFMPEG is highly recommended for converting the mp4v to an HTML5 compatible libx264 stream.
-    try:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", temp_out_path, "-vcodec", "libx264", final_out_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=True
-        )
-        display_path = final_out_path
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        # Fallback if ffmpeg isn't installed (though we added it to packages.txt)
-        st.warning("FFMPEG not found. Video may not play in some browsers.")
-        display_path = temp_out_path
+    import shutil
+    import sys
+
+    ffmpeg_bin = (
+        shutil.which("ffmpeg")
+        or shutil.which("ffmpeg", path=f"{sys.prefix}/bin")
+        or (os.path.join(sys.prefix, "bin", "ffmpeg") if os.path.exists(os.path.join(sys.prefix, "bin", "ffmpeg")) else None)
+    )
+
+    display_path = temp_out_path
+    if ffmpeg_bin:
+        try:
+            subprocess.run(
+                [
+                    ffmpeg_bin,
+                    "-y",
+                    "-i", temp_out_path,
+                    "-vcodec", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    final_out_path,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            display_path = final_out_path
+        except Exception:
+            display_path = temp_out_path
 
     progress_bar.empty()
     media_placeholder.empty()
 
     # ── Play the completely smooth final video! ────────────────────────
-    with open(display_path, 'rb') as f:
-        video_bytes = f.read()
-    media_placeholder.video(video_bytes)
+    if os.path.exists(display_path):
+        with open(display_path, 'rb') as f:
+            video_bytes = f.read()
+        media_placeholder.video(video_bytes)
+    elif os.path.exists(temp_out_path):
+        with open(temp_out_path, 'rb') as f:
+            video_bytes = f.read()
+        media_placeholder.video(video_bytes)
+    else:
+        st.error("Processed video output file could not be generated.")
 
     st.success(
         f"✅ Video analysis complete — "

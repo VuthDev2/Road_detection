@@ -1,5 +1,10 @@
 # 🛣️ Road Damage Detection
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-FF4B4B.svg)](https://streamlit.io)
+[![Ultralytics YOLO](https://img.shields.io/badge/Ultralytics-YOLO-00FFFF.svg)](https://github.com/ultralytics/ultralytics)
+
 Real-time road surface defect detection and tracking using YOLO + ByteTrack, built as a Streamlit web application.
 
 Detects four damage categories from dashcam images and video:
@@ -165,3 +170,9 @@ python -m pytest tests/ -v
 
 - Ultralytics YOLO: https://github.com/ultralytics/ultralytics
 - Dataset: Roboflow Universe Road Damage Detection Dataset
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
