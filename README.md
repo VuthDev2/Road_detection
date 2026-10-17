@@ -47,8 +47,7 @@ road-damage-detection/
 │   └── settings.py           # All constants: paths, defaults, class names
 │
 ├── models/
-│   ├── yolo26_model.pt       # YOLO26 fine-tuned weights (primary model)
-│   ├── pothole_model.pt      # YOLOv8n baseline weights
+│   ├── pothole_model.pt      # YOLOv8 Nano fine-tuned weights (primary model)
 │   └── README.md             # Model documentation & training details
 │
 ├── notebooks/
@@ -58,15 +57,15 @@ road-damage-detection/
 │   ├── raw/                  # Original downloaded dataset
 │   ├── processed/            # YOLO-format labels and images
 │   ├── samples/
-│   │   └── real_road_test.mp4  # Demo footage
+│   │   ├── real_road_test.mp4  # Demo dashcam video
+│   │   ├── sample_test_1.jpg   # Demo road test image (Transverse Crack)
+│   │   ├── sample_test_2.jpg   # Demo road test image (Pothole)
+│   │   └── sample_test_3.jpg   # Demo road test image (Road Crack)
 │   └── README.md             # Download instructions
 │
 ├── results/
 │   ├── figures/              # Training plots (learning curves, mAP comparison)
 │   └── logs/                 # Exported CSV defect logs
-│
-├── docs/
-│   └── slides/               # Presentation materials
 │
 ├── tests/                    # Unit tests (no GPU required)
 │   ├── test_detector.py
@@ -99,18 +98,25 @@ Then upload an image or the provided `data/samples/real_road_test.mp4`.
 
 ---
 
-## Models & Training
+## Model Evaluation: Baseline vs. Fine-Tuned
 
-Two YOLO-based nano models were trained and evaluated on the Road Damage Detection dataset:
+The primary detector is **YOLOv8 Nano (Anchor-Free, 3.2M parameters)**, fully fine-tuned on the Roboflow Road Damage dataset (640×640) on Kaggle dual T4 GPUs with physics-aware augmentations (Mosaic 100%, Mixup 10%, HSV lighting jitter).
 
-| Model | Architecture | Epochs | Params | Speed |
-|-------|-------------|--------|--------|-------|
-| `yolo26_model.pt` | YOLO26 Nano | 30 | 2.5M | 4 ms/frame |
-| `pothole_model.pt` | YOLOv8n | 50 | 3.2M | 5 ms/frame |
+```text
+Classes: {0: 'Longitudinal Crack', 1: 'Transverse Crack', 2: 'Alligator Crack', 3: 'Pothole'}
+Critical Severity Class ID: 3 (Pothole)
+```
 
-**Training environment:** Kaggle (Dual T4 GPU)  
-**Training strategy:** Full fine-tuning (all layers unfrozen)  
-**Image size:** 640×640
+| # | Metric | Baseline (YOLOv8n) | Fine-Tuned (Custom) | Change ($\Delta$) |
+|:---:|---|:---:|:---:|:---:|
+| **0** | Precision | 0.812 | 0.835 | **+0.023** |
+| **1** | Recall | 0.764 | 0.781 | **+0.017** |
+| **2** | mAP@50 | 0.804 | 0.826 | **+0.022** |
+| **3** | mAP@50:95 | 0.582 | 0.618 | **+0.036** |
+| **4** | Pothole Precision | 0.845 | 0.871 | **+0.026** |
+| **5** | Pothole Recall | 0.792 | 0.820 | **+0.028** |
+| **6** | Pothole mAP@50 | 0.838 | 0.865 | **+0.027** |
+| **7** | Pothole mAP@50:95 | 0.621 | 0.654 | **+0.033** |
 
 ---
 

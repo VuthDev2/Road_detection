@@ -18,7 +18,7 @@ from PIL import Image
 from config.settings import InferenceConfig, DAMAGE_CLASSES
 from src.core.detector import Detector
 from src.core.preprocessor import Preprocessor
-from src.utils.visualization import annotated_to_rgb
+from src.utils.visualization import annotated_to_rgb, extract_detected_crops
 from app.components.telemetry import (
     TelemetryWidgets,
     update_telemetry,
@@ -73,3 +73,26 @@ def render_image_page(
     media_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
 
     st.success(f"✅ Image analysis complete — **{total_defects}** defect(s) detected.")
+
+    # ── Render Detected Objects Gallery (Cropped defect patches) ───────
+    crops = extract_detected_crops(image, results[0])
+    if crops:
+        st.markdown("---")
+        st.markdown("#### 🔲 Detected Objects")
+        st.caption("Extracted defect bounding boxes with localized confidence scores:")
+
+        cols_per_row = min(len(crops), 4)
+        cols = st.columns(cols_per_row)
+
+        for i, item in enumerate(crops):
+            col = cols[i % cols_per_row]
+            with col:
+                st.image(item["crop"], use_container_width=True)
+                st.markdown(
+                    f"<div style='background-color:#1e293b; color:#f8fafc; padding:6px 8px; "
+                    f"border-radius:6px; font-size:12px; text-align:center; font-weight:600; "
+                    f"border:1px solid rgba(255,255,255,0.12); margin-top:4px; "
+                    f"box-shadow: 0 2px 4px rgba(0,0,0,0.2);'>"
+                    f"{item['class_name']} · {item['confidence']:.0%}</div>",
+                    unsafe_allow_html=True,
+                )

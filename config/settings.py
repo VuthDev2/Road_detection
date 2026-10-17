@@ -23,10 +23,9 @@ DATA_DIR = PROJECT_ROOT / "data"
 # ---------------------------------------------------------------------------
 
 AVAILABLE_MODELS: dict[str, Path] = {
-    "YOLO26 Nano (Primary — Fine-Tuned)": MODELS_DIR / "yolo26_model.pt",
-    "YOLOv8 Nano (Baseline)": MODELS_DIR / "pothole_model.pt",
+    "YOLOv8 Nano (Fine-Tuned)": MODELS_DIR / "pothole_model.pt",
 }
-FALLBACK_MODEL_PATH = MODELS_DIR / "yolo26_model.pt"
+FALLBACK_MODEL_PATH = MODELS_DIR / "pothole_model.pt"
 
 
 # ---------------------------------------------------------------------------

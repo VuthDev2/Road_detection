@@ -40,3 +40,6 @@ htmlcov/
 
 # ── Ultralytics / YOLO run artifacts ─────────────────────────────────────────
 runs/
+
+# ── Private Defense Notes & Slides (Local Only) ──────────────────────────────
+docs/slides/

@@ -33,7 +33,7 @@ def main() -> None:
     # ── Header ─────────────────────────────────────────────────────────
     st.title("🛣️ Real-Time Road Damage Detection & Tracking")
     st.markdown(
-        "Automated defect logging powered by **YOLOv8 / YOLO26** and **ByteTrack**. "
+        "Automated defect logging powered by **YOLOv8 Nano** and **ByteTrack**. "
         "Upload dashcam footage or a road image to get started."
     )
     st.divider()
